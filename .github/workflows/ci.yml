@@ -1,0 +1,57 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  schedule:
+    # Daily. The shapes job below is the only thing that would notice the contract growing
+    # or renaming a field, and it needs to run without waiting for someone to push.
+    - cron: "17 6 * * *"
+
+permissions:
+  contents: read
+
+jobs:
+  check:
+    name: Types and image
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      # `ci`, not `install`: it fails on a lockfile that disagrees with package.json, which
+      # is the check worth having for a container that holds a signing key.
+      - run: npm ci
+
+      - run: npm run typecheck
+
+      # The most valuable job here. This repository was extracted from a monorepo whose
+      # Dockerfile copied from `keeper/`, and nothing short of an actual build would notice
+      # if a path like that came back.
+      - name: Build the image
+        run: docker build -t dscrt-keeper:ci .
+
+      # Sends nothing and needs no key. Proves the image starts, reaches the chain and reads
+      # the protocol, which together are most of what "it works" means here.
+      - name: Health probe against the live protocol
+        run: docker run --rm dscrt-keeper:ci node --experimental-strip-types src/index.ts --check-only
+
+  shapes:
+    name: Contract shapes
+    # Not on pull_request: this queries a live testnet, and a chain having a bad afternoon
+    # must never be able to block a merge.
+    if: github.event_name != 'pull_request'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npm run test:shapes

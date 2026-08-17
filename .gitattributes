@@ -1,0 +1,4 @@
+# LF everywhere, and this one is load-bearing rather than tidy: the Dockerfile and `.env`
+# are read inside a Linux container, where a trailing CR makes the shell fail with errors
+# that point nowhere near the real cause.
+* text=auto eol=lf

@@ -1,0 +1,22 @@
+# Run the keeper on anything with Docker — a home server does the job.
+#
+#   cp .env.example .env      and fill it in
+#   docker compose up -d
+#
+services:
+  keeper:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    env_file: .env
+    restart: unless-stopped
+    # Outbound only. Nothing listens, so nothing needs exposing.
+    network_mode: bridge
+    read_only: true
+    security_opt:
+      - no-new-privileges:true
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "5"

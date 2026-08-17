@@ -1,0 +1,29 @@
+{
+  "name": "dscrt-keeper",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Permissionless upkeep bot for dSCRT, liquid staking on Secret Network",
+  "license": "Apache-2.0",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/jirkacepelka/dscrt-keeper.git"
+  },
+  "engines": {
+    "node": ">=22.6"
+  },
+  "scripts": {
+    "start": "node --experimental-strip-types src/index.ts",
+    "once": "node --experimental-strip-types src/index.ts --once",
+    "check": "node --experimental-strip-types src/index.ts --check-only",
+    "typecheck": "tsc --noEmit",
+    "test:shapes": "node --experimental-strip-types --test test/shapes.test.ts"
+  },
+  "dependencies": {
+    "secretjs": "^1.22.1"
+  },
+  "devDependencies": {
+    "@types/node": "^22.10.0",
+    "typescript": "^5.7.0"
+  }
+}

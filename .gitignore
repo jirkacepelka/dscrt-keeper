@@ -1,0 +1,8 @@
+node_modules/
+
+# The keeper's key lives here. Nothing in this directory but the template is publishable.
+.env
+.env.*
+!.env.example
+
+*.tsbuildinfo
