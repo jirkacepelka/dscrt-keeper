@@ -5,4 +5,11 @@ node_modules/
 .env.*
 !.env.example
 
+# The data directory: config written by the console, the operation ledger, the drift
+# baselines — and the key, when somebody sets one through the console rather than the
+# environment. In the container this is a mounted volume at /data; running directly it
+# lands here. Nothing in it belongs in a repository.
+data/
+ci-data/
+
 *.tsbuildinfo

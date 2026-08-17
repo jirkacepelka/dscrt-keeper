@@ -17,6 +17,7 @@
     "once": "node --experimental-strip-types src/index.ts --once",
     "check": "node --experimental-strip-types src/index.ts --check-only",
     "typecheck": "tsc --noEmit",
+    "test": "node --experimental-strip-types --test test/console.test.ts",
     "test:shapes": "node --experimental-strip-types --test test/shapes.test.ts"
   },
   "dependencies": {

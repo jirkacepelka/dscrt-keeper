@@ -1,0 +1,323 @@
+/*
+ * The console's own layer, on top of the design system.
+ *
+ * `globals.css` beside this file is a **verbatim copy** from the dSCRT app, and it is kept
+ * verbatim on purpose: re-syncing it after a redesign is then a file copy rather than a
+ * merge. Everything the console needs and the app does not lives here, so a re-copy never
+ * clobbers it.
+ *
+ * Two things belong here and nowhere else:
+ *
+ *   1. The typefaces. The app loads them through `next/font`, which does not exist outside
+ *      Next, and this console must not fetch them from a CDN — see web/fonts/README.md.
+ *   2. The handful of shapes the app has no equivalent for: a login screen, a settings
+ *      form, a ledger table that scrolls sideways on a phone.
+ *
+ * No colour is defined here. If one appears below, it is a mistake — every value comes from
+ * a token in globals.css so it can only be wrong in one place, and so both themes keep
+ * working without anybody maintaining two of anything.
+ */
+
+/* ---------------------------------------------------------------- fonts */
+
+/*
+ * Both families are variable across 100–900. The design uses 520, 540, 560, 580, 620 and
+ * 650, so a static cut would round every one of them to the nearest of four and the whole
+ * page would read a weight heavier than it should.
+ *
+ * `latin-ext` is not optional: ě ř š č ž ů live there.
+ */
+@font-face {
+  font-family: Geist;
+  font-style: normal;
+  font-weight: 100 900;
+  font-display: swap;
+  src: url("/fonts/geist-latin.woff2") format("woff2");
+  unicode-range: u+00??, u+0131, u+0152-0153, u+02bb-02bc, u+02c6, u+02da, u+02dc, u+0304,
+    u+0308, u+0329, u+2000-206f, u+20ac, u+2122, u+2191, u+2193, u+2212, u+2215, u+feff,
+    u+fffd;
+}
+@font-face {
+  font-family: Geist;
+  font-style: normal;
+  font-weight: 100 900;
+  font-display: swap;
+  src: url("/fonts/geist-latin-ext.woff2") format("woff2");
+  unicode-range: u+0100-02ba, u+02bd-02c5, u+02c7-02cc, u+02ce-02d7, u+02dd-02ff, u+0304,
+    u+0308, u+0329, u+1d00-1dbf, u+1e00-1e9f, u+1ef2-1eff, u+2020, u+20a0-20ab, u+20ad-20c0,
+    u+2113, u+2c60-2c7f, u+a720-a7ff;
+}
+@font-face {
+  font-family: Inter;
+  font-style: normal;
+  font-weight: 100 900;
+  font-display: swap;
+  src: url("/fonts/inter-latin.woff2") format("woff2");
+  unicode-range: u+00??, u+0131, u+0152-0153, u+02bb-02bc, u+02c6, u+02da, u+02dc, u+0304,
+    u+0308, u+0329, u+2000-206f, u+20ac, u+2122, u+2191, u+2193, u+2212, u+2215, u+feff,
+    u+fffd;
+}
+@font-face {
+  font-family: Inter;
+  font-style: normal;
+  font-weight: 100 900;
+  font-display: swap;
+  src: url("/fonts/inter-latin-ext.woff2") format("woff2");
+  unicode-range: u+0100-02ba, u+02bd-02c5, u+02c7-02cc, u+02ce-02d7, u+02dd-02ff, u+0304,
+    u+0308, u+0329, u+1d00-1dbf, u+1e00-1e9f, u+1ef2-1eff, u+2020, u+20a0-20ab, u+20ad-20c0,
+    u+2113, u+2c60-2c7f, u+a720-a7ff;
+}
+
+/*
+ * The two names `globals.css` expects. In the app these are set by `next/font`, which hands
+ * out a generated family name; here they are the real names, and the fallback chain in
+ * `--font` / `--font-display` still does its job behind them.
+ */
+:root {
+  --font-geist: Geist;
+  --font-inter: Inter;
+}
+
+/* ---------------------------------------------------------------- shell */
+
+/*
+ * Narrower than the app's 1120px. The console has one column of settings and one table; at
+ * the app's width the forms stretch into something nobody wants to read across.
+ */
+.shell-body {
+  max-width: 880px;
+}
+
+/* The three tabs are buttons rather than links — one page, no routing. */
+.tabs button.tab {
+  border: 0;
+  background: transparent;
+  font-family: inherit;
+  cursor: pointer;
+}
+
+/* ---------------------------------------------------------------- forms */
+
+.form {
+  display: flex;
+  flex-direction: column;
+  gap: var(--s-4);
+}
+
+/*
+ * Two fields to a row where they fit, one where they do not. `auto-fit` rather than a
+ * breakpoint, because the settings panel is the same shape in a sidebar as on a phone.
+ */
+.form-pair {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: var(--s-4);
+}
+
+/*
+ * A field the environment has claimed.
+ *
+ * Shown, and shown as unreachable — the value is real and the operator should see it, but
+ * an input they can type into that will not take effect is worse than no input at all.
+ */
+.field--pinned .input {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+.field-note {
+  font-size: 11.5px;
+  color: var(--ink-3);
+  line-height: 1.45;
+}
+
+/* Right-aligned actions under a form. Wraps rather than overflowing on a narrow screen. */
+.actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--s-2);
+  justify-content: flex-end;
+  align-items: center;
+}
+.actions--split {
+  justify-content: space-between;
+}
+.actions--spaced {
+  margin-top: var(--s-5);
+}
+
+/* The unlock form, when it appears below the one that stores a key. */
+.form + .form {
+  margin-top: var(--s-4);
+}
+
+/* ---------------------------------------------------------------- ledger */
+
+/*
+ * The history table on a phone.
+ *
+ * A ledger has six columns and a hash in one of them, and there is no honest way to fit
+ * that into 360px. It scrolls sideways inside its own panel rather than stretching the page,
+ * which is the one place horizontal scrolling is the right answer.
+ */
+.table-wrap {
+  overflow-x: auto;
+  margin: 0 calc(var(--s-5) * -1);
+  padding: 0 var(--s-5);
+}
+.table-wrap table.plain {
+  min-width: 620px;
+}
+
+/* Hashes and heights are for comparing, not reading. */
+.mono {
+  font-family: var(--font-mono);
+  font-size: 12.5px;
+}
+
+/* A task name in the ledger's first column, so the eye can group runs without reading. */
+.tag {
+  font-size: 11.5px;
+  font-weight: 560;
+  color: var(--ink-2);
+  white-space: nowrap;
+}
+
+/* ---------------------------------------------------------------- login */
+
+/*
+ * `margin-block: auto` rather than centring with flex alignment: auto margins collapse when
+ * the content outgrows the space, instead of clipping its top out of reach on a short
+ * window — the same reason the app centres its staking card this way.
+ */
+.gate {
+  width: min(420px, 100%);
+  margin-inline: auto;
+  margin-block: auto;
+}
+.gate .h1 {
+  margin: 6px 0 var(--s-4);
+}
+.gate .form {
+  margin-top: var(--s-5);
+}
+
+/* ---------------------------------------------------------------- layout */
+
+/*
+ * Everything below exists because the content security policy refuses inline styles.
+ *
+ * The app writes its one-off spacing as `style={{ marginTop: "var(--s-4)" }}`, which is
+ * reasonable in React and impossible here: `style-src 'self'` blocks every `style`
+ * attribute, and the alternative — adding `'unsafe-inline'` — would weaken the policy on a
+ * page that can set a signing key in order to save writing a dozen class names.
+ *
+ * So they are class names. Named for what they are rather than for what they do, so this
+ * stays a stylesheet rather than becoming a private utility framework.
+ */
+
+.sprite {
+  position: absolute;
+  width: 0;
+  height: 0;
+}
+
+.page-head {
+  margin-bottom: var(--s-6);
+}
+.page-head .h1 {
+  margin-top: 6px;
+}
+.page-head .prose {
+  margin-top: var(--s-3);
+  max-width: 62ch;
+}
+
+/* Panels down a page, evenly spaced, without every one carrying its own margin. */
+.sections > * + * {
+  margin-top: var(--s-4);
+}
+
+.panel-head {
+  margin-bottom: var(--s-4);
+}
+.panel-head--tight {
+  margin-bottom: var(--s-2);
+}
+
+.stats-row {
+  margin-bottom: var(--s-5);
+}
+
+/* The three job rows, and the six findings under them. */
+.list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--s-2);
+}
+
+.task {
+  display: flex;
+  gap: var(--s-3);
+  align-items: flex-start;
+}
+.task-mark {
+  display: flex;
+  flex: none;
+  margin-top: 2px;
+}
+.task-body {
+  flex: 1;
+  min-width: 0;
+}
+.task-body .hint + .hint,
+.task-body .row + .hint {
+  margin-top: 4px;
+}
+.task-effect {
+  color: var(--ink-2);
+}
+.task-when {
+  white-space: nowrap;
+}
+
+/* An icon in a notice keeps its size when the sentence beside it wraps. */
+.notice > svg {
+  flex: none;
+}
+
+/* An input with a button welded to its right — the endpoint field, and nothing else yet. */
+.field-row {
+  display: flex;
+  gap: var(--s-2);
+}
+.field-row .input {
+  flex: 1;
+}
+
+/* The three state colours, for an icon that has to carry one. */
+.ink-good {
+  color: var(--good);
+}
+.ink-warn {
+  color: var(--warn);
+}
+.ink-bad {
+  color: var(--bad);
+}
+.ink-quiet {
+  color: var(--ink-3);
+}
+
+/* ---------------------------------------------------------------- state */
+
+[hidden] {
+  display: none !important;
+}
+
+/* The whole page while the first poll is in flight, so nothing flashes empty then full. */
+.loading {
+  opacity: 0.5;
+  pointer-events: none;
+  transition: opacity var(--med) var(--ease);
+}

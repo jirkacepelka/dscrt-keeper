@@ -5,6 +5,7 @@
 import { SecretNetworkClient, Wallet } from "secretjs";
 
 import type { KeeperConfig } from "./config.ts";
+import { hasKey } from "./secrets.ts";
 
 export interface ProtocolState {
   total_bonded: string;
@@ -37,6 +38,20 @@ export interface UnbondWindow {
   scrt_claimed: string;
   validators_used: string[];
   state: "open" | "unbonding" | "matured" | "settled";
+}
+
+/**
+ * What the chain gave back for one upkeep transaction.
+ *
+ * Every field here was already on the response and thrown away. The hash is what makes a
+ * line in the history verifiable against an explorer rather than a claim the keeper makes
+ * about itself, and `gasWanted` is what the fee is actually charged on — see `feeFor`.
+ */
+export interface Receipt {
+  txHash: string;
+  height: number;
+  gasUsed: number;
+  gasWanted: number;
 }
 
 /**
@@ -87,13 +102,28 @@ export class Keeper {
     return this.signer;
   }
 
-  /** Whether a key is configured at all, without throwing if one is not. */
+  /** Whether the keeper can sign right now, without throwing if it cannot. */
   get hasKey(): boolean {
-    return Boolean(process.env.KEEPER_MNEMONIC);
+    return hasKey();
   }
 
   get address(): string {
     return this.signing.address;
+  }
+
+  /**
+   * The address, or `null` when there is no key to derive one from.
+   *
+   * The console asks this on every poll, including before anybody has configured a key and
+   * while an encrypted one is still locked. Throwing there would turn "no key yet" — the
+   * ordinary first-run state — into an error page.
+   */
+  get maybeAddress(): string | null {
+    try {
+      return this.address;
+    } catch {
+      return null;
+    }
   }
 
   /**
@@ -192,12 +222,12 @@ export class Keeper {
    */
   async execute(
     msg: object,
-  ): Promise<{ ok: true; txHash: string } | { ok: false; error: string }> {
+  ): Promise<{ ok: true; receipt: Receipt } | { ok: false; error: string }> {
     try {
       // Thrown rather than returned so `withCodeHash` can see a rejected transaction as a
       // failure worth re-checking the hash over. A stale hash surfaces as a failed tx, not
       // as an exception, so returning early here would skip the retry that matters most.
-      const txHash = await this.withCodeHash(async (code_hash) => {
+      const receipt = await this.withCodeHash(async (code_hash) => {
         const tx = await this.signing.tx.compute.executeContract(
           {
             sender: this.address,
@@ -212,10 +242,15 @@ export class Keeper {
           },
         );
         if (tx.code !== 0) throw new Error(tx.rawLog);
-        return tx.transactionHash;
+        return {
+          txHash: tx.transactionHash,
+          height: tx.height,
+          gasUsed: tx.gasUsed,
+          gasWanted: tx.gasWanted,
+        };
       });
 
-      return { ok: true, txHash };
+      return { ok: true, receipt };
     } catch (e) {
       return { ok: false, error: e instanceof Error ? e.message : String(e) };
     }
@@ -235,8 +270,13 @@ export class Keeper {
    * at four validators and would have gone tight at the contract's ceiling of twenty.
    *
    * `GAS_LIMIT` still overrides, for a chain whose costs have moved.
+   *
+   * Public because the console prices a cadence with it. Quoting a monthly gas bill from a
+   * fourth copy of these constants — the app has one, `scripts/gas-probe.mjs` scrapes a
+   * third out of this file by regex — is how a figure on a screen drifts from the figure on
+   * the invoice.
    */
-  private gasLimit(): number {
+  gasLimit(): number {
     if (this.config.gasLimit) return this.config.gasLimit;
     const n = this.validatorCount ?? MAX_VALIDATORS;
     return Math.ceil((COMPOUND_BASE_GAS + PER_VALIDATOR_GAS * n) * GAS_MARGIN);
@@ -244,6 +284,34 @@ export class Keeper {
 
   /** Set once the keeper has seen the set, so the first transaction assumes the worst. */
   validatorCount: number | null = null;
+
+  /**
+   * Rewards sitting at the validators right now, in uscrt.
+   *
+   * Not the same figure as `state.pending_rewards`, which is a cache the contract only
+   * refreshes on a sync or a compound — so on a protocol nobody has touched for an hour it
+   * reads zero while a real balance accrues. Asking whether a compound is worth its gas
+   * from the cache would answer "there is nothing there" about money that is very much
+   * there. The distribution module knows the live figure and will tell anyone who asks.
+   *
+   * `null` when the endpoint could not answer, which callers must treat as "unknown" and
+   * not as "zero" — declining to work because a query failed is the wrong direction.
+   */
+  async liveRewards(): Promise<number | null> {
+    try {
+      const res = await fetch(
+        `${this.config.lcdUrl}/cosmos/distribution/v1beta1/delegators/${this.config.contract}/rewards`,
+      );
+      if (!res.ok) return null;
+
+      const body = (await res.json()) as { total?: { denom: string; amount: string }[] };
+      const total = (body.total ?? []).find((c) => c.denom === "uscrt")?.amount;
+      // The distribution module reports fractional uscrt; only whole ones are withdrawable.
+      return total === undefined ? null : Math.floor(Number(total));
+    } catch {
+      return null;
+    }
+  }
 
   /** Balance of the keeper's own account, so it can warn before it runs out of gas. */
   async gasBalance(): Promise<bigint> {

@@ -8,6 +8,7 @@
  */
 
 import type { Keeper, ProtocolState, ValidatorEntry } from "./client.ts";
+import { store, type Store } from "./store.ts";
 
 export type Severity = "ok" | "warn" | "alert";
 
@@ -21,6 +22,67 @@ export interface Finding {
 export interface Memory {
   lastExchangeRate?: bigint;
   lastBondedByValidator?: Record<string, bigint>;
+}
+
+const MEMORY_FILE = "memory.json";
+
+/** The same thing, in a shape JSON can hold: bigint is not serialisable. */
+interface StoredMemory {
+  lastExchangeRate?: string;
+  lastBondedByValidator?: Record<string, string>;
+}
+
+/**
+ * Carry the baselines across a restart.
+ *
+ * Without this, every restart made the keeper blind to exactly the two things these checks
+ * exist for. The exchange-rate check reported `(first reading)` and could not have noticed a
+ * fall, and drift detection had no previous delegation to compare against — so a container
+ * that restarts nightly, which is what `restart: unless-stopped` plus a home server's power
+ * cuts amounts to, was running a monitor that never monitored.
+ */
+export function loadMemory(from: Store = store): Memory {
+  const stored = from.readJson<StoredMemory>(MEMORY_FILE, {});
+  const memory: Memory = {};
+
+  if (stored.lastExchangeRate) {
+    try {
+      memory.lastExchangeRate = BigInt(stored.lastExchangeRate);
+    } catch {
+      // A corrupt figure is the same as no figure: the next pass becomes the baseline.
+    }
+  }
+  if (stored.lastBondedByValidator) {
+    const bonded: Record<string, bigint> = {};
+    for (const [address, amount] of Object.entries(stored.lastBondedByValidator)) {
+      try {
+        bonded[address] = BigInt(amount);
+      } catch {
+        // Skip the one that will not parse rather than lose the whole set.
+      }
+    }
+    memory.lastBondedByValidator = bonded;
+  }
+
+  return memory;
+}
+
+export function saveMemory(memory: Memory, from: Store = store): void {
+  const stored: StoredMemory = {};
+  if (memory.lastExchangeRate !== undefined) {
+    stored.lastExchangeRate = memory.lastExchangeRate.toString();
+  }
+  if (memory.lastBondedByValidator) {
+    stored.lastBondedByValidator = Object.fromEntries(
+      Object.entries(memory.lastBondedByValidator).map(([k, v]) => [k, v.toString()]),
+    );
+  }
+
+  try {
+    from.writeJson(MEMORY_FILE, stored);
+  } catch {
+    // A monitor that cannot save its baseline is still a monitor. Upkeep continues.
+  }
 }
 
 const RATE_SCALE = 1_000_000_000_000_000_000n;

@@ -14,7 +14,7 @@ permissions:
 
 jobs:
   check:
-    name: Types and image
+    name: Types, console and image
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -30,9 +30,17 @@ jobs:
 
       - run: npm run typecheck
 
-      # The most valuable job here. This repository was extracted from a monorepo whose
-      # Dockerfile copied from `keeper/`, and nothing short of an actual build would notice
-      # if a path like that came back.
+      # The console's API, end to end against a real process on a real port: the password
+      # gate, the environment-beats-file rule, that a stored key never comes back out, and
+      # that the static handler cannot be walked out of. No chain involved — the server
+      # answers before the first upkeep pass, so a testnet outage cannot fail this.
+      - name: Console API
+        run: npm test
+
+      # This repository was extracted from a monorepo whose Dockerfile copied from `keeper/`,
+      # and nothing short of an actual build would notice if a path like that came back. It
+      # now also has to copy `web/`, which is a second way to ship an image that starts and
+      # then serves nothing.
       - name: Build the image
         run: docker build -t dscrt-keeper:ci .
 
@@ -40,6 +48,41 @@ jobs:
       # the protocol, which together are most of what "it works" means here.
       - name: Health probe against the live protocol
         run: docker run --rm dscrt-keeper:ci node --experimental-strip-types src/index.ts --check-only
+
+      # The container has to come up as a container — with its volume, its port, its
+      # entrypoint dropping from root, and its healthcheck — not just as a process. Every one
+      # of those is a way for the image to build cleanly and be unusable on the box it was
+      # built for.
+      - name: The container serves its console
+        run: |
+          set -eux
+          mkdir -p ci-data
+          docker run -d --name keeper-ci -p 8787:8787 \
+            -v "$PWD/ci-data:/data" --read-only dscrt-keeper:ci
+
+          # `/healthz` answers 503 until the first pass completes, which is a correct answer
+          # and not a reason to keep waiting for a different one.
+          for _ in $(seq 1 30); do
+            code=$(curl -s -o /dev/null -w '%{http_code}' http://127.0.0.1:8787/healthz || true)
+            case "$code" in 200|503) break ;; esac
+            sleep 1
+          done
+          test "$code" = "200" -o "$code" = "503"
+
+          curl -fsS http://127.0.0.1:8787/ | grep -q 'dSCRT keeper'
+
+          # The entrypoint must have dropped. `docker exec` would start a fresh process as
+          # the image's user, which is root by design, so this asks who owns PID 1 instead —
+          # the only process that matters here.
+          owner=$(docker exec keeper-ci stat -c %U /proc/1)
+          test "$owner" = "node" || (echo "PID 1 is running as $owner" && exit 1)
+
+          # The volume has to be genuinely writable *by that user*, or the keeper keeps no
+          # history and saves no settings while looking perfectly healthy. Asked as `node`
+          # rather than as root, which could write to it either way and would prove nothing.
+          docker exec -u node keeper-ci test -w /data
+
+          docker rm -f keeper-ci
 
   shapes:
     name: Contract shapes

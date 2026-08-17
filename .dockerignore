@@ -1,0 +1,18 @@
+# Keep the build context to what the image actually runs.
+#
+# `data/` matters most: it is where a locally-run keeper puts its key, and copying it into a
+# build context is how a mnemonic ends up baked into a published image layer.
+data/
+ci-data/
+node_modules/
+.env
+.env.*
+!.env.example
+
+.git/
+.github/
+.claude/
+test/
+zimaos/
+*.md
+*.tsbuildinfo

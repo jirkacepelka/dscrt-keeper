@@ -1,0 +1,489 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>dSCRT keeper</title>
+    <meta name="robots" content="noindex, nofollow" />
+    <link rel="icon" href="/brand/steak.svg" type="image/svg+xml" />
+
+    <!--
+      Loaded in the head, synchronously, and as a file rather than inline.
+
+      It has to run before the first paint or a dark-mode operator gets a white flash on
+      every load. The usual trick is an inline script, which would mean opening the content
+      security policy to `unsafe-inline` on a page that can set a signing key. A separate
+      file costs one request from the same origin and keeps the policy closed.
+
+      For the same reason there is not one `style` attribute in this file. Every piece of
+      spacing below is a class in console.css.
+    -->
+    <script src="/theme.js"></script>
+
+    <link rel="stylesheet" href="/globals.css" />
+    <link rel="stylesheet" href="/console.css" />
+  </head>
+
+  <body>
+    <!--
+      The icon set, once, as a sprite.
+
+      Same glyphs as the app: a 24-unit grid, 1.75 stroke, `currentColor` so they take the
+      colour of whatever they sit in. A sprite rather than a package for the same reason the
+      app inlines them — they cannot arrive late or fail to load.
+    -->
+    <svg class="sprite" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.75"
+      stroke-linecap="round" stroke-linejoin="round">
+      <symbol id="icon-check" viewBox="0 0 24 24"><path d="M20 6 9 17l-5-5" /></symbol>
+      <symbol id="icon-alert" viewBox="0 0 24 24">
+        <path d="M12 9v4M12 17h.01" />
+        <path
+          d="M10.29 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0Z"
+        />
+      </symbol>
+      <symbol id="icon-info" viewBox="0 0 24 24">
+        <circle cx="12" cy="12" r="9" />
+        <path d="M12 16v-4M12 8h.01" />
+      </symbol>
+      <symbol id="icon-clock" viewBox="0 0 24 24">
+        <circle cx="12" cy="12" r="9" />
+        <path d="M12 7v5l3 2" />
+      </symbol>
+      <symbol id="icon-copy" viewBox="0 0 24 24">
+        <rect x="9" y="9" width="12" height="12" rx="2" />
+        <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1" />
+      </symbol>
+      <symbol id="icon-sun" viewBox="0 0 24 24">
+        <circle cx="12" cy="12" r="4" />
+        <path
+          d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"
+        />
+      </symbol>
+      <symbol id="icon-moon" viewBox="0 0 24 24">
+        <path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8Z" />
+      </symbol>
+      <symbol id="icon-logout" viewBox="0 0 24 24">
+        <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4M16 17l5-5-5-5M21 12H9" />
+      </symbol>
+      <symbol id="icon-wallet" viewBox="0 0 24 24">
+        <path
+          d="M19 7V5a2 2 0 0 0-2-2H5a2 2 0 0 0 0 4h14a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5"
+        />
+        <path d="M16 12h.01" />
+      </symbol>
+    </svg>
+
+    <div class="shell">
+      <nav class="nav">
+        <div class="nav-inner">
+          <span class="brand">
+            <img src="/brand/steak.svg" width="26" height="26" alt="" />
+            Steak<sup>scrt</sup>
+          </span>
+
+          <div class="tabs" id="tabs" hidden>
+            <button class="tab" type="button" data-tab="overview" aria-current="page">
+              Overview
+            </button>
+            <button class="tab" type="button" data-tab="history">History</button>
+            <button class="tab" type="button" data-tab="settings">Settings</button>
+          </div>
+
+          <div class="nav-end">
+            <span class="net" id="net" hidden>
+              <span class="dot"></span><span id="net-chain"></span>
+            </span>
+            <button class="icon-btn" id="theme" type="button" title="Appearance">
+              <svg width="16" height="16"><use href="#icon-moon" /></svg>
+            </button>
+            <button class="icon-btn" id="logout" type="button" title="Sign out" hidden>
+              <svg width="16" height="16"><use href="#icon-logout" /></svg>
+            </button>
+          </div>
+        </div>
+      </nav>
+
+      <main class="shell-body" id="main">
+        <!-- First run, or signed out. -->
+        <section class="gate" id="gate" hidden>
+          <div class="panel">
+            <p class="eyebrow" id="gate-eyebrow">Sign in</p>
+            <h1 class="h1" id="gate-title">Keeper console</h1>
+            <p class="prose" id="gate-prose"></p>
+
+            <form class="form" id="gate-form">
+              <div class="field">
+                <label class="field-label" for="gate-password">Password</label>
+                <input
+                  class="input"
+                  id="gate-password"
+                  type="password"
+                  autocomplete="current-password"
+                  required
+                />
+              </div>
+              <div class="field" id="gate-confirm-field" hidden>
+                <label class="field-label" for="gate-confirm">Repeat it</label>
+                <input class="input" id="gate-confirm" type="password" autocomplete="new-password" />
+              </div>
+              <div class="notice notice--bad" id="gate-error" hidden>
+                <svg width="16" height="16"><use href="#icon-alert" /></svg>
+                <span></span>
+              </div>
+              <button class="btn btn--block" type="submit" id="gate-submit">Sign in</button>
+            </form>
+          </div>
+        </section>
+
+        <!-- ---------------------------------------------------------- overview -->
+        <section class="sections" id="tab-overview" hidden>
+          <header class="page-head">
+            <p class="eyebrow">Upkeep, running</p>
+            <h1 class="h1">Keeper</h1>
+            <p class="prose">
+              This harvests rewards and restakes them, closes the withdrawal window when it
+              falls due, and books what has finished unbonding. Every message it sends is one
+              anyone could send — it holds gas and nothing else, and it cannot move anyone's
+              funds.
+            </p>
+          </header>
+
+          <div id="key-state" hidden></div>
+
+          <div class="panel">
+            <div class="row panel-head">
+              <h2 class="h2" id="status-head">Reading the protocol…</h2>
+              <span class="pill" id="attended" hidden><span class="dot"></span><span></span></span>
+            </div>
+
+            <div class="grid grid-3 stats-row">
+              <div class="stat">
+                <span class="stat-label">Keeper address</span>
+                <button class="addr" id="address" type="button" title="Copy">
+                  <span>—</span>
+                  <svg width="13" height="13"><use href="#icon-copy" /></svg>
+                </button>
+                <span class="stat-note" id="address-note"></span>
+              </div>
+              <div class="stat">
+                <span class="stat-label">Gas balance</span>
+                <span class="stat-value num" id="gas">—<span class="stat-unit">SCRT</span></span>
+                <span class="stat-note" id="gas-note"></span>
+              </div>
+              <div class="stat">
+                <span class="stat-label">Spent on upkeep</span>
+                <span class="stat-value num" id="spent">—<span class="stat-unit">SCRT</span></span>
+                <span class="stat-note" id="spent-note"></span>
+              </div>
+            </div>
+
+            <div class="list" id="tasks"></div>
+
+            <div class="actions actions--spaced" id="run-row">
+              <span class="hint" id="run-hint"></span>
+              <button class="btn" id="run-all" type="button" disabled>Run upkeep now</button>
+            </div>
+          </div>
+
+          <div class="panel">
+            <h2 class="h2 panel-head">What the keeper is watching</h2>
+            <div class="list" id="findings"></div>
+          </div>
+
+          <div class="notice">
+            <svg width="15" height="15"><use href="#icon-info" /></svg>
+            <span>
+              A dead keeper costs yield, not access. Deposits, withdrawals and claims all keep
+              their own bookkeeping, so nobody is locked out of their money while this is down —
+              rewards simply sit unharvested and stop compounding.
+            </span>
+          </div>
+        </section>
+
+        <!-- ---------------------------------------------------------- history -->
+        <section class="sections" id="tab-history" hidden>
+          <header class="page-head">
+            <p class="eyebrow">Every transaction this keeper sent</p>
+            <h1 class="h1">History</h1>
+          </header>
+
+          <div class="panel">
+            <div class="actions actions--split panel-head">
+              <div class="segmented" id="history-filter">
+                <button type="button" data-filter="" aria-pressed="true">All</button>
+                <button type="button" data-filter="compound">Compound</button>
+                <button type="button" data-filter="advance-window">Windows</button>
+                <button type="button" data-filter="failed">Failed</button>
+              </div>
+              <span class="hint" id="history-count"></span>
+            </div>
+
+            <div class="table-wrap">
+              <table class="plain">
+                <thead>
+                  <tr>
+                    <th>When</th>
+                    <th>Job</th>
+                    <th>What happened</th>
+                    <th>Transaction</th>
+                    <th>Fee</th>
+                  </tr>
+                </thead>
+                <tbody id="history-rows"></tbody>
+              </table>
+            </div>
+
+            <div class="empty" id="history-empty" hidden>
+              <svg class="ink-quiet" width="20" height="20"><use href="#icon-clock" /></svg>
+              <p class="hint">
+                Nothing yet. Transactions appear here as the keeper sends them — a compound
+                lands every interval, windows only when one falls due.
+              </p>
+            </div>
+
+            <div class="actions">
+              <button class="btn btn--ghost btn--sm" id="history-more" type="button" hidden>
+                Show more
+              </button>
+            </div>
+          </div>
+        </section>
+
+        <!-- ---------------------------------------------------------- settings -->
+        <section class="sections" id="tab-settings" hidden>
+          <header class="page-head">
+            <p class="eyebrow">Everything the keeper needs</p>
+            <h1 class="h1">Settings</h1>
+          </header>
+
+          <div class="notice notice--warn" id="not-writable" hidden>
+            <svg width="16" height="16"><use href="#icon-alert" /></svg>
+            <span>
+              The data directory is not writable, so nothing here can be saved and no history
+              is being kept. Mount a volume at <code>/data</code>.
+            </span>
+          </div>
+
+          <!-- The key ------------------------------------------------------ -->
+          <div class="panel">
+            <div class="row panel-head--tight">
+              <h2 class="h2">Recovery phrase</h2>
+              <span class="pill" id="key-pill"><span class="dot"></span><span></span></span>
+            </div>
+            <p class="prose panel-head">
+              This key needs gas and nothing else. Every message the keeper sends is
+              permissionless, so a leaked keeper key costs you SCRT and stalls upkeep — it
+              cannot move user funds, change the fee, or touch the validator set.
+              <strong>Never put the manager's key here.</strong>
+            </p>
+
+            <form class="form" id="wallet-form">
+              <div class="field">
+                <label class="field-label" for="mnemonic">12 or 24 words</label>
+                <textarea
+                  class="input"
+                  id="mnemonic"
+                  rows="3"
+                  autocomplete="off"
+                  spellcheck="false"
+                ></textarea>
+                <span class="field-note" id="mnemonic-note"></span>
+              </div>
+
+              <div class="field">
+                <label class="field-label" for="passphrase">
+                  Encrypt it with a passphrase (optional)
+                </label>
+                <input class="input" id="passphrase" type="password" autocomplete="off" />
+                <span class="field-note">
+                  Encryption protects the file, not the volume — anyone holding both the data
+                  directory and the container's environment holds both halves. What it buys is
+                  that a backup or a snapshot is not a key. Leave this blank and the phrase is
+                  stored as a mode-0600 env file instead. If you set it, the keeper needs
+                  <code>KEEPER_PASSPHRASE</code> in its environment to sign again after a
+                  restart, or one unlock here.
+                </span>
+              </div>
+
+              <div class="actions actions--split">
+                <button class="btn btn--danger btn--sm" type="button" id="forget-key" hidden>
+                  Forget this key
+                </button>
+                <button class="btn btn--sm" type="submit" id="save-key">Save key</button>
+              </div>
+            </form>
+
+            <form class="form" id="unlock-form" hidden>
+              <div class="field">
+                <label class="field-label" for="unlock-passphrase">Passphrase</label>
+                <input class="input" id="unlock-passphrase" type="password" autocomplete="off" />
+              </div>
+              <div class="actions">
+                <button class="btn btn--sm" type="submit">Unlock</button>
+              </div>
+            </form>
+          </div>
+
+          <!-- Cadence ------------------------------------------------------ -->
+          <div class="panel">
+            <h2 class="h2 panel-head--tight">How often to compound</h2>
+            <p class="prose panel-head">
+              <strong>Hourly does not earn more than six-hourly.</strong> Rewards accrue
+              continuously and harvesting only moves them, so the choice is not about yield —
+              it is about how stale the published exchange rate is allowed to get, and what you
+              are willing to pay for that.
+            </p>
+
+            <div class="segmented segmented--full" id="cadence">
+              <button type="button" data-value="15m">15 min</button>
+              <button type="button" data-value="1h">Hourly</button>
+              <button type="button" data-value="6h">6 hours</button>
+              <button type="button" data-value="24h">Daily</button>
+            </div>
+
+            <div class="row stats-row">
+              <span class="k">Estimated gas</span>
+              <span class="v num" id="cadence-cost">—</span>
+            </div>
+            <div class="row panel-head">
+              <span class="k">Exchange rate never staler than</span>
+              <span class="v" id="cadence-staleness">—</span>
+            </div>
+
+            <div class="form-pair">
+              <div class="field">
+                <label class="field-label" for="compoundInterval">Or set it exactly</label>
+                <input class="input" id="compoundInterval" placeholder="1h" />
+                <span class="field-note">
+                  Like <code>30s</code>, <code>15m</code> or <code>6h</code>.
+                </span>
+              </div>
+              <div class="field">
+                <label class="field-label" for="compoundFloor">Do not harvest below (SCRT)</label>
+                <input class="input num" id="compoundFloor" inputmode="decimal" placeholder="0" />
+                <span class="field-note">
+                  Zero harvests whatever is there. Set a floor and the keeper skips a compound
+                  whose rewards are worth less than the gas — read live from the distribution
+                  module, not from the contract's cache.
+                </span>
+              </div>
+            </div>
+
+            <div class="actions">
+              <button class="btn btn--sm" type="button" id="save-cadence">Save cadence</button>
+            </div>
+          </div>
+
+          <!-- Chain -------------------------------------------------------- -->
+          <div class="panel">
+            <h2 class="h2 panel-head">Chain and contract</h2>
+
+            <form class="form" id="chain-form">
+              <div class="form-pair">
+                <div class="field" data-setting="chainId">
+                  <label class="field-label" for="chainId">Chain id</label>
+                  <input class="input" id="chainId" />
+                  <span class="field-note"></span>
+                </div>
+                <div class="field" data-setting="windowIntervalMs">
+                  <label class="field-label" for="windowInterval">Window check, at most every</label>
+                  <input class="input" id="windowInterval" />
+                  <span class="field-note">
+                    A ceiling, not a cadence — the contract publishes the second each window
+                    falls due and the keeper wakes for it. Checking costs a query and no gas.
+                  </span>
+                </div>
+              </div>
+
+              <div class="field" data-setting="lcdUrl">
+                <label class="field-label" for="lcdUrl">LCD endpoint</label>
+                <div class="field-row">
+                  <input class="input" id="lcdUrl" />
+                  <button class="btn btn--ghost btn--sm" type="button" id="probe">Test</button>
+                </div>
+                <span class="field-note" id="probe-result"></span>
+              </div>
+
+              <div class="field" data-setting="contract">
+                <label class="field-label" for="contract">lst-core address</label>
+                <input class="input mono" id="contract" />
+                <span class="field-note"></span>
+              </div>
+
+              <div class="field" data-setting="contractCodeHash">
+                <label class="field-label" for="contractCodeHash">Code hash (optional)</label>
+                <input class="input mono" id="contractCodeHash" placeholder="resolved from the chain" />
+                <span class="field-note">
+                  Leave it empty and the keeper asks the chain, which is what lets it sit through
+                  a migration without anybody editing anything. Pin it and the keeper uses yours
+                  and never looks — a deliberate refusal to follow the contract admin anywhere,
+                  at the cost of stopping dead the moment they migrate.
+                </span>
+              </div>
+
+              <div class="form-pair">
+                <div class="field" data-setting="gasPrice">
+                  <label class="field-label" for="gasPrice">Gas price</label>
+                  <input class="input" id="gasPrice" />
+                  <span class="field-note"></span>
+                </div>
+                <div class="field" data-setting="pageLimit">
+                  <label class="field-label" for="pageLimit">Validators per call</label>
+                  <input class="input num" id="pageLimit" inputmode="numeric" />
+                  <span class="field-note"></span>
+                </div>
+              </div>
+
+              <div class="actions">
+                <button class="btn btn--sm" type="submit">Save</button>
+              </div>
+            </form>
+          </div>
+
+          <!-- Console password -------------------------------------------- -->
+          <div class="panel">
+            <h2 class="h2 panel-head">Console password</h2>
+            <form class="form" id="password-form">
+              <div class="form-pair">
+                <div class="field">
+                  <label class="field-label" for="current-password">Current</label>
+                  <input
+                    class="input"
+                    id="current-password"
+                    type="password"
+                    autocomplete="current-password"
+                  />
+                </div>
+                <div class="field">
+                  <label class="field-label" for="new-password">New</label>
+                  <input
+                    class="input"
+                    id="new-password"
+                    type="password"
+                    autocomplete="new-password"
+                  />
+                </div>
+              </div>
+              <div class="actions">
+                <button class="btn btn--sm btn--quiet" type="submit">Change password</button>
+              </div>
+            </form>
+          </div>
+        </section>
+      </main>
+
+      <footer class="footer">
+        <div class="footer-inner">
+          <span id="uptime">dSCRT keeper</span>
+          <a class="link" href="https://github.com/jirkacepelka/dscrt-keeper" rel="noreferrer">
+            Source
+          </a>
+        </div>
+      </footer>
+    </div>
+
+    <div class="toasts" id="toasts"></div>
+
+    <script src="/app.js" type="module"></script>
+  </body>
+</html>

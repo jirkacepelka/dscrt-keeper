@@ -7,7 +7,7 @@
  * rather than trusted — anyone can run one, and nobody has to.
  */
 
-import type { Keeper } from "./client.ts";
+import type { Keeper, Receipt } from "./client.ts";
 import type { KeeperConfig } from "./config.ts";
 
 export interface TaskOutcome {
@@ -23,6 +23,16 @@ export interface TaskOutcome {
    * a user transaction creates it, and anything so created is days away.
    */
   nextDue?: number;
+  /**
+   * Every transaction this task sent, in order.
+   *
+   * A paginated sweep is several transactions with several hashes and several fees, and
+   * summing them is the only honest way to say what a compound cost. These used to be
+   * discarded the moment `execute` returned.
+   */
+  receipts?: Receipt[];
+  /** Set when the task failed, so the caller does not have to parse `detail` to find out. */
+  error?: string;
 }
 
 const nothing = (task: string, detail: string, nextDue?: number): TaskOutcome => ({
@@ -44,6 +54,7 @@ const nothing = (task: string, detail: string, nextDue?: number): TaskOutcome =>
  */
 export async function sync(keeper: Keeper, config: KeeperConfig): Promise<TaskOutcome> {
   const before = await keeper.state();
+  const receipts: Receipt[] = [];
 
   let calls = 0;
   // Bounded so a misconfigured page limit cannot spin forever.
@@ -51,14 +62,23 @@ export async function sync(keeper: Keeper, config: KeeperConfig): Promise<TaskOu
     const result = await keeper.execute({ sync: { limit: config.pageLimit } });
     calls++;
     if (!result.ok) {
-      return { task: "sync", did: "work", detail: `failed after ${calls}: ${result.error}` };
+      return {
+        task: "sync",
+        did: "work",
+        detail: `failed after ${calls}: ${result.error}`,
+        receipts,
+        error: result.error,
+      };
     }
+    receipts.push(result.receipt);
+
     const state = await keeper.state();
     if (!state.is_unattended) {
       return {
         task: "sync",
         did: "work",
         detail: `fresh after ${calls} call(s), bonded ${state.total_bonded}`,
+        receipts,
       };
     }
   }
@@ -67,6 +87,7 @@ export async function sync(keeper: Keeper, config: KeeperConfig): Promise<TaskOu
     task: "sync",
     did: "work",
     detail: `still stale after ${calls} calls — was ${before.last_sync_time}`,
+    receipts,
   };
 }
 
@@ -76,8 +97,28 @@ export async function sync(keeper: Keeper, config: KeeperConfig): Promise<TaskOu
  * Paginated over the validator set for the same gas reason as `sync`.
  */
 export async function compound(keeper: Keeper, config: KeeperConfig): Promise<TaskOutcome> {
+  /*
+   * Decline to harvest dust, when the operator has asked for that.
+   *
+   * The browser console in the app has always had this floor and the daemon never did, so
+   * the two disagreed about whether a tenth of a SCRT was worth a transaction. The floor
+   * defaults to zero here — adopting it silently would change what an existing keeper
+   * spends — and reads the live figure from the distribution module rather than the
+   * contract's cache, which is stale by exactly as long as it has been since the last
+   * compound and therefore always reads low at the moment this question is asked.
+   */
+  if (config.compoundFloor > 0) {
+    const rewards = await keeper.liveRewards();
+    if (rewards !== null && rewards < config.compoundFloor) {
+      return nothing(
+        "compound",
+        `${(rewards / 1e6).toFixed(4)} SCRT accrued, below the ${(config.compoundFloor / 1e6).toFixed(2)} SCRT floor`,
+      );
+    }
+  }
+
+  const receipts: Receipt[] = [];
   let calls = 0;
-  let harvested = 0n;
 
   for (let i = 0; i < 20; i++) {
     const result = await keeper.execute({ compound: { limit: config.pageLimit } });
@@ -87,20 +128,32 @@ export async function compound(keeper: Keeper, config: KeeperConfig): Promise<Ta
         task: "compound",
         did: calls > 1 ? "work" : "nothing",
         detail: `failed after ${calls}: ${result.error}`,
+        receipts,
+        error: result.error,
       };
     }
+    receipts.push(result.receipt);
 
     // The contract reports `done` in its response data, but reading it back through the
     // state query is simpler and equally conclusive: a finished sweep leaves no pending
     // rewards and a fresh cache.
     const state = await keeper.state();
-    harvested = BigInt(state.pending_rewards);
-    if (!state.is_unattended && harvested === 0n) {
-      return { task: "compound", did: "work", detail: `swept in ${calls} call(s)` };
+    if (!state.is_unattended && BigInt(state.pending_rewards) === 0n) {
+      return {
+        task: "compound",
+        did: "work",
+        detail: `swept in ${calls} call(s)`,
+        receipts,
+      };
     }
   }
 
-  return { task: "compound", did: "work", detail: `incomplete after ${calls} calls` };
+  return {
+    task: "compound",
+    did: "work",
+    detail: `incomplete after ${calls} calls`,
+    receipts,
+  };
 }
 
 /**
@@ -129,8 +182,18 @@ export async function advanceWindow(keeper: Keeper): Promise<TaskOutcome> {
 
   const result = await keeper.execute({ advance_window: {} });
   return result.ok
-    ? { task: "advance-window", did: "work", detail: `closed window ${open.id}` }
-    : { task: "advance-window", did: "work", detail: `failed: ${result.error}` };
+    ? {
+        task: "advance-window",
+        did: "work",
+        detail: `closed window ${open.id}`,
+        receipts: [result.receipt],
+      }
+    : {
+        task: "advance-window",
+        did: "work",
+        detail: `failed: ${result.error}`,
+        error: result.error,
+      };
 }
 
 /** Mark windows whose unbonding period has elapsed as claimable. */
@@ -159,6 +222,12 @@ export async function collectMatured(
         task: "collect-matured",
         did: "work",
         detail: `collected ${due.length} window(s): ${due.map((w) => w.id).join(", ")}`,
+        receipts: [result.receipt],
       }
-    : { task: "collect-matured", did: "work", detail: `failed: ${result.error}` };
+    : {
+        task: "collect-matured",
+        did: "work",
+        detail: `failed: ${result.error}`,
+        error: result.error,
+      };
 }

@@ -1,0 +1,1535 @@
+/*
+ * Design system.
+ *
+ * The brief named Uniswap, Lido and Shade. What each is actually good at, and what is
+ * taken from it:
+ *
+ *   Uniswap — one card, one job. The amount is the largest thing on the screen, the
+ *   details fold away until asked for, and there is exactly one primary button. Nothing
+ *   competes with the action you came to perform.
+ *
+ *   Lido — calm. Generous space, restrained colour, and a habit of explaining what is
+ *   about to happen in plain words rather than hiding it behind a tooltip. This protocol
+ *   locks money up for three weeks, so that habit is not optional here.
+ *
+ *   Shade — that a dark interface can carry dense figures without feeling like a terminal,
+ *   given enough contrast discipline.
+ *
+ * Both themes are first-class. Every colour is a token defined once per theme and never
+ * hard-coded at a use site, so a value can only be wrong in one place.
+ */
+
+/* ---------------------------------------------------------------- tokens */
+
+:root {
+  /* Surfaces, darkest to lightest. `raised` is the card; `sunken` is a well inside it. */
+  --bg: #0a0b0d;
+  --bg-glow: #101318;
+  --surface: #121418;
+  --raised: #16191f;
+  --sunken: #0e1013;
+  --overlay: #16191f;
+
+  --line: rgba(255, 255, 255, 0.07);
+  --line-strong: rgba(255, 255, 255, 0.13);
+
+  --ink: #f2f4f7;
+  --ink-2: #a7b0bd;
+  --ink-3: #6d7683;
+
+  --accent: #7cc6e8;
+  --accent-hover: #93d3f0;
+  --accent-ink: #06222e;
+  --accent-wash: rgba(124, 198, 232, 0.12);
+
+  --good: #6fd39a;
+  --warn: #e6bd76;
+  --bad: #ef8f7f;
+  --good-wash: rgba(111, 211, 154, 0.12);
+  --warn-wash: rgba(230, 189, 118, 0.12);
+  --bad-wash: rgba(239, 143, 127, 0.12);
+
+  --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.4);
+  --shadow-md: 0 8px 24px -8px rgba(0, 0, 0, 0.6);
+  --shadow-lg: 0 24px 60px -20px rgba(0, 0, 0, 0.75);
+
+  /* Radii. Cards are soft, controls inside them are softer still. */
+  --r-xs: 8px;
+  --r-sm: 12px;
+  --r-md: 16px;
+  --r-lg: 22px;
+  --r-xl: 28px;
+  --r-full: 999px;
+
+  /* Spacing, a 4px rhythm. */
+  --s-1: 4px;
+  --s-2: 8px;
+  --s-3: 12px;
+  --s-4: 16px;
+  --s-5: 20px;
+  --s-6: 24px;
+  --s-8: 32px;
+  --s-10: 40px;
+  --s-12: 48px;
+  --s-16: 64px;
+
+  --shell: 1120px;
+  --card: 480px;
+  --nav-h: 63px;
+
+  --font: var(--font-inter), ui-sans-serif, system-ui, -apple-system, sans-serif;
+  --font-display: var(--font-geist), var(--font);
+  --font-mono: ui-monospace, "SF Mono", "Cascadia Mono", Menlo, monospace;
+
+  --ease: cubic-bezier(0.32, 0.72, 0, 1);
+  --fast: 120ms;
+  --med: 220ms;
+}
+
+[data-theme="light"] {
+  /*
+   * Deliberately not white. The slabs are, and a white page under white cards leaves them
+   * resting on nothing but their own shadow — the floating reads as a rendering artefact
+   * rather than as a choice. A few percent of grey is all it takes.
+   */
+  --bg: #eef1f5;
+  --bg-glow: #ffffff;
+  --surface: #ffffff;
+  --raised: #ffffff;
+  --sunken: #f4f6f9;
+  --overlay: #ffffff;
+
+  --line: rgba(16, 24, 40, 0.08);
+  --line-strong: rgba(16, 24, 40, 0.16);
+
+  --ink: #10151c;
+  --ink-2: #59636f;
+  --ink-3: #8b95a1;
+
+  --accent: #1b90c4;
+  --accent-hover: #157aa8;
+  --accent-ink: #ffffff;
+  --accent-wash: rgba(27, 144, 196, 0.1);
+
+  --good: #17976a;
+  --warn: #a8770f;
+  --bad: #c8503a;
+  --good-wash: rgba(23, 151, 106, 0.1);
+  --warn-wash: rgba(168, 119, 15, 0.1);
+  --bad-wash: rgba(200, 80, 58, 0.1);
+
+  --shadow-sm: 0 1px 2px rgba(16, 24, 40, 0.06);
+  --shadow-md: 0 10px 28px -12px rgba(16, 24, 40, 0.22);
+  --shadow-lg: 0 28px 64px -24px rgba(16, 24, 40, 0.28);
+}
+
+/* ---------------------------------------------------------------- base */
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+html {
+  -webkit-text-size-adjust: 100%;
+}
+
+body {
+  margin: 0;
+  min-height: 100vh;
+  background: var(--bg);
+  color: var(--ink);
+  font-family: var(--font);
+  font-size: 15px;
+  line-height: 1.5;
+  -webkit-font-smoothing: antialiased;
+  /*
+   * Two very soft light sources, and nothing else. Once the cards lost their own surface
+   * the page became the backdrop rather than a container, so it has to be worth looking
+   * at: a cool wash overhead and a trace of the accent low and left, both far too diffuse
+   * to read as shapes. Fixed, so the light stays put while the content scrolls past it.
+   */
+  background-image:
+    radial-gradient(90ch 50ch at 50% -8%, var(--bg-glow) 0%, transparent 68%),
+    radial-gradient(70ch 40ch at 8% 105%, var(--accent-wash) 0%, transparent 60%);
+  background-attachment: fixed;
+  background-repeat: no-repeat;
+}
+
+::selection {
+  background: var(--accent-wash);
+}
+
+button,
+input,
+select,
+textarea {
+  font: inherit;
+  color: inherit;
+}
+
+:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+  border-radius: var(--r-xs);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    transition-duration: 0.01ms !important;
+  }
+}
+
+/* ---------------------------------------------------------------- type */
+
+.num {
+  font-variant-numeric: tabular-nums;
+  font-feature-settings: "tnum";
+  letter-spacing: -0.01em;
+}
+
+.h1 {
+  font-family: var(--font-display);
+  font-size: 32px;
+  font-weight: 650;
+  letter-spacing: -0.025em;
+  line-height: 1.15;
+  margin: 0;
+}
+
+.h2 {
+  font-family: var(--font-display);
+  font-size: 19px;
+  font-weight: 620;
+  letter-spacing: -0.015em;
+  margin: 0;
+}
+
+.h3 {
+  font-size: 15px;
+  font-weight: 600;
+  letter-spacing: -0.005em;
+  margin: 0;
+}
+
+.eyebrow {
+  font-size: 12px;
+  font-weight: 560;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--ink-3);
+  margin: 0;
+}
+
+.muted {
+  color: var(--ink-2);
+}
+
+.faint {
+  color: var(--ink-3);
+}
+
+.prose {
+  font-size: 13.5px;
+  line-height: 1.6;
+  color: var(--ink-2);
+  margin: 0;
+}
+
+.prose strong {
+  color: var(--ink);
+  font-weight: 580;
+}
+
+code {
+  font-family: var(--font-mono);
+  font-size: 0.9em;
+  background: var(--sunken);
+  border: 1px solid var(--line);
+  border-radius: var(--r-xs);
+  padding: 1px 5px;
+}
+
+/* ---------------------------------------------------------------- shell */
+
+.shell {
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+}
+
+.shell-body {
+  flex: 1;
+  width: 100%;
+  max-width: var(--shell);
+  margin: 0 auto;
+  padding: var(--s-8) var(--s-5) var(--s-16);
+}
+
+/* The staking screen is a single card, optically centred in what is left of the page. */
+.centred {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding-top: var(--s-8);
+}
+
+@media (max-width: 720px) {
+  .shell-body {
+    padding: var(--s-5) var(--s-4) var(--s-12);
+  }
+  .centred {
+    padding-top: 0;
+  }
+}
+
+/* ---------------------------------------------------------------- nav */
+
+.nav {
+  position: sticky;
+  top: 0;
+  z-index: 30;
+  backdrop-filter: blur(14px);
+  background: color-mix(in srgb, var(--bg) 82%, transparent);
+  border-bottom: 1px solid var(--line);
+}
+
+.nav-inner {
+  /* Full width on purpose: the bar is chrome, and chrome belongs to the window rather
+     than to the column of content underneath it. */
+  padding: var(--s-3) var(--s-6);
+  display: flex;
+  align-items: center;
+  gap: var(--s-6);
+}
+
+.brand {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--s-2);
+  text-decoration: none;
+  color: var(--ink);
+  font-family: var(--font-display);
+  font-size: 17px;
+  font-weight: 650;
+  letter-spacing: -0.02em;
+  white-space: nowrap;
+}
+
+.brand img {
+  width: 26px;
+  height: 26px;
+}
+
+.brand sup {
+  font-size: 0.52em;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  color: var(--accent);
+  top: -0.65em;
+}
+
+/*
+ * Navigation as text.
+ *
+ * A pill track drew a box around three words and made the bar look like a control panel.
+ * Where you are is legible from weight and colour alone, which is how a page usually says
+ * it, and leaves the bar quiet enough to be ignored.
+ */
+.tabs {
+  display: flex;
+  align-items: center;
+  gap: var(--s-6);
+}
+
+.tab {
+  font-size: 14.5px;
+  font-weight: 520;
+  color: var(--ink-3);
+  text-decoration: none;
+  white-space: nowrap;
+  padding: var(--s-2) 0;
+  transition: color var(--fast) var(--ease);
+}
+
+.tab:hover {
+  color: var(--ink-2);
+}
+
+.tab[aria-current="page"] {
+  color: var(--ink);
+  font-weight: 580;
+}
+
+.nav-end {
+  margin-left: auto;
+  display: flex;
+  align-items: center;
+  gap: var(--s-2);
+}
+
+@media (max-width: 860px) {
+  .nav-inner {
+    flex-wrap: wrap;
+    gap: var(--s-2) var(--s-5);
+    padding: var(--s-2) var(--s-4);
+  }
+  .tabs {
+    order: 3;
+    width: 100%;
+    justify-content: space-between;
+  }
+  .tab {
+    flex: 1;
+    text-align: center;
+  }
+  .nav-end {
+    margin-left: auto;
+  }
+}
+
+/*
+ * On a phone the network pill would take a row to itself, which is a lot of chrome to
+ * spend above the one card the screen is for. The dot alone carries the warning; the full
+ * chain id is a tap away in settings.
+ */
+/* The chain is a fact about the session, not a badge. */
+.net {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12.5px;
+  font-weight: 520;
+  color: var(--ink-3);
+  white-space: nowrap;
+}
+
+.net .dot {
+  background: var(--warn);
+}
+
+@media (max-width: 560px) {
+  .nav-inner {
+    padding: 6px var(--s-4);
+  }
+  .brand {
+    font-size: 15px;
+  }
+  .brand img {
+    width: 22px;
+    height: 22px;
+  }
+  .net span:not(.dot) {
+    display: none;
+  }
+}
+
+/* ---------------------------------------------------------------- surfaces */
+
+/*
+ * The card is a grouping, not a surface.
+ *
+ * It has no fill, no border and no shadow — what floats is what it contains. That inverts
+ * the usual depth: fields used to be wells sunk into a card, and are now slabs lifted off
+ * the page, which is the only reading that makes sense once there is nothing behind them.
+ */
+.card {
+  border-radius: var(--r-lg);
+}
+
+/* A panel still gathers things, but as lightly as it can while staying legible. */
+.panel {
+  background: var(--raised);
+  border: 1px solid var(--line);
+  border-radius: var(--r-lg);
+  padding: var(--s-5);
+  box-shadow: var(--shadow-sm);
+}
+
+.card--flat {
+  box-shadow: none;
+}
+
+/* The lifted slab: every real surface in the app is one of these. */
+.well {
+  background: var(--raised);
+  border: 1px solid var(--line);
+  border-radius: var(--r-md);
+  padding: var(--s-4);
+  box-shadow: var(--shadow-md);
+}
+
+.stack {
+  display: flex;
+  flex-direction: column;
+}
+
+.grid {
+  display: grid;
+  gap: var(--s-4);
+}
+
+.grid-2 {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.grid-3 {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.grid-4 {
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+}
+
+@media (max-width: 900px) {
+  .grid-3,
+  .grid-4 {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 560px) {
+  .grid-2,
+  .grid-3,
+  .grid-4 {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+.divider {
+  height: 1px;
+  background: var(--line);
+  border: 0;
+  margin: 0;
+}
+
+/* ---------------------------------------------------------------- stats */
+
+/*
+ * A figure with nothing around it.
+ *
+ * Four boxed numbers side by side read as four objects; unboxed they read as one row of
+ * facts, which is what they are. The page's own quiet is doing the separating.
+ */
+.stat {
+  padding: var(--s-4) var(--s-5) var(--s-4) 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-width: 0;
+}
+
+/* Sections that group without enclosing. */
+.bare {
+  padding: 0;
+  background: transparent;
+  border: 0;
+  box-shadow: none;
+}
+
+.stat-label {
+  font-size: 12.5px;
+  font-weight: 520;
+  color: var(--ink-3);
+  display: flex;
+  align-items: center;
+  gap: var(--s-2);
+}
+
+.stat-value {
+  font-family: var(--font-display);
+  font-size: 26px;
+  font-weight: 620;
+  letter-spacing: -0.03em;
+  line-height: 1.1;
+  overflow-wrap: anywhere;
+}
+
+.stat-unit {
+  font-size: 14px;
+  font-weight: 520;
+  color: var(--ink-3);
+  margin-left: 4px;
+  letter-spacing: 0;
+}
+
+.stat-note {
+  font-size: 12.5px;
+  color: var(--ink-3);
+  line-height: 1.45;
+}
+
+/* ---------------------------------------------------------------- segmented */
+
+.segmented {
+  display: inline-flex;
+  padding: var(--s-1);
+  background: var(--sunken);
+  border: 1px solid var(--line);
+  border-radius: var(--r-full);
+  gap: 2px;
+}
+
+.segmented--full {
+  display: flex;
+  width: 100%;
+}
+
+.segmented button {
+  flex: 1;
+  border: 0;
+  background: transparent;
+  color: var(--ink-2);
+  font-size: 13.5px;
+  font-weight: 560;
+  padding: 8px 18px;
+  border-radius: var(--r-full);
+  cursor: pointer;
+  white-space: nowrap;
+  transition: color var(--fast) var(--ease), background var(--fast) var(--ease);
+}
+
+.segmented button:hover:not([aria-pressed="true"]) {
+  color: var(--ink);
+}
+
+.segmented button[aria-pressed="true"] {
+  background: var(--raised);
+  color: var(--ink);
+  box-shadow: var(--shadow-sm);
+}
+
+/* ---------------------------------------------------------------- amount field */
+
+/*
+ * The amount field is an outline, not a slab.
+ *
+ * Nothing behind it: on a page this quiet a border is enough to say "type here", and a
+ * filled box would be the heaviest thing on a screen whose whole job is one number. The
+ * edge brightens on focus rather than the fill appearing, so the field never changes
+ * weight while somebody is using it.
+ */
+.amount {
+  background: transparent;
+  border: 1px solid var(--line-strong);
+  border-radius: var(--r-md);
+  padding: var(--s-4);
+  display: flex;
+  flex-direction: column;
+  gap: var(--s-3);
+  transition: border-color var(--med) var(--ease);
+}
+
+.amount:focus-within {
+  border-color: var(--accent);
+}
+
+.amount-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--s-3);
+  font-size: 12.5px;
+  color: var(--ink-3);
+  min-height: 24px;
+}
+
+.amount-row {
+  display: flex;
+  align-items: center;
+  gap: var(--s-3);
+}
+
+.amount-row input {
+  flex: 1;
+  min-width: 0;
+  border: 0;
+  background: transparent;
+  outline: none;
+  font-family: var(--font-display);
+  font-size: 34px;
+  font-weight: 600;
+  letter-spacing: -0.03em;
+  font-variant-numeric: tabular-nums;
+  color: var(--ink);
+  padding: 0;
+}
+
+.amount-row input::placeholder {
+  color: var(--ink-3);
+}
+
+/* Shortcuts, under the amount and its token. */
+.amount-chips {
+  display: flex;
+  gap: var(--s-2);
+}
+
+.token {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--s-2);
+  background: var(--sunken);
+  border: 1px solid var(--line);
+  border-radius: var(--r-full);
+  padding: 6px 12px 6px 6px;
+  font-weight: 580;
+  font-size: 14.5px;
+  white-space: nowrap;
+  box-shadow: var(--shadow-sm);
+}
+
+.token img {
+  width: 24px;
+  height: 24px;
+  border-radius: var(--r-full);
+}
+
+.mini {
+  border: 1px solid var(--line);
+  background: transparent;
+  color: var(--ink-2);
+  font-size: 11.5px;
+  font-weight: 580;
+  letter-spacing: 0.02em;
+  padding: 3px 9px;
+  border-radius: var(--r-full);
+  cursor: pointer;
+  transition: all var(--fast) var(--ease);
+}
+
+.mini:hover:not(:disabled) {
+  color: var(--accent);
+  border-color: var(--accent);
+  background: var(--accent-wash);
+}
+
+.mini:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+/* ---------------------------------------------------------------- rows */
+
+.row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--s-4);
+  font-size: 13.5px;
+  min-height: 24px;
+}
+
+.row + .row {
+  margin-top: var(--s-3);
+}
+
+.row dt,
+.row .k {
+  color: var(--ink-2);
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.row dd,
+.row .v {
+  margin: 0;
+  font-weight: 560;
+  text-align: right;
+  overflow-wrap: anywhere;
+}
+
+/* Details that fold away until asked for. */
+.details {
+  border-top: 1px solid var(--line);
+}
+
+.details summary {
+  list-style: none;
+  cursor: pointer;
+  padding: var(--s-3) 0;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--s-4);
+  font-size: 13.5px;
+  color: var(--ink-2);
+}
+
+/* The received amount. Weighted like any other value, not shouted. */
+.details summary .result {
+  display: flex;
+  align-items: center;
+  gap: var(--s-2);
+  font-weight: 560;
+  color: var(--ink);
+}
+
+.details summary .result .unit {
+  color: var(--ink-3);
+  font-weight: 520;
+}
+
+.details summary::-webkit-details-marker {
+  display: none;
+}
+
+.details summary:hover {
+  color: var(--ink);
+}
+
+.details summary svg {
+  transition: transform var(--med) var(--ease);
+}
+
+.details[open] summary svg {
+  transform: rotate(180deg);
+}
+
+.details-body {
+  padding-bottom: var(--s-3);
+}
+
+/* ---------------------------------------------------------------- buttons */
+
+.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--s-2);
+  border: 1px solid transparent;
+  border-radius: var(--r-md);
+  background: var(--accent);
+  color: var(--accent-ink);
+  font-size: 15px;
+  font-weight: 600;
+  padding: 14px 20px;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: background var(--fast) var(--ease), transform var(--fast) var(--ease),
+    opacity var(--fast) var(--ease);
+}
+
+.btn:hover:not(:disabled) {
+  background: var(--accent-hover);
+}
+
+.btn:active:not(:disabled) {
+  transform: translateY(1px);
+}
+
+.btn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.btn--block {
+  width: 100%;
+}
+
+.btn--lg {
+  font-size: 16px;
+  padding: 16px 24px;
+  border-radius: var(--r-md);
+}
+
+.btn--sm {
+  font-size: 13.5px;
+  font-weight: 560;
+  padding: 8px 14px;
+  border-radius: var(--r-sm);
+}
+
+.btn--ghost {
+  background: transparent;
+  border-color: var(--line);
+  color: var(--ink);
+}
+
+.btn--ghost:hover:not(:disabled) {
+  background: var(--sunken);
+  border-color: var(--line-strong);
+}
+
+.btn--quiet {
+  background: var(--sunken);
+  border-color: var(--line);
+  color: var(--ink);
+}
+
+.btn--quiet:hover:not(:disabled) {
+  background: var(--surface);
+  border-color: var(--line-strong);
+}
+
+.btn--danger {
+  background: var(--bad-wash);
+  border-color: var(--bad);
+  color: var(--bad);
+}
+
+/* Square icon-only control, for the nav. */
+.icon-btn {
+  width: 36px;
+  height: 36px;
+  display: grid;
+  place-items: center;
+  border-radius: var(--r-sm);
+  border: 1px solid var(--line);
+  background: transparent;
+  color: var(--ink-2);
+  cursor: pointer;
+  transition: all var(--fast) var(--ease);
+}
+
+.icon-btn:hover {
+  color: var(--ink);
+  background: var(--sunken);
+  border-color: var(--line-strong);
+}
+
+/* ---------------------------------------------------------------- pills */
+
+.pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  font-weight: 560;
+  padding: 5px 11px;
+  border-radius: var(--r-full);
+  background: var(--sunken);
+  border: 1px solid var(--line);
+  color: var(--ink-2);
+  white-space: nowrap;
+}
+
+.pill--good {
+  background: var(--good-wash);
+  border-color: transparent;
+  color: var(--good);
+}
+
+.pill--warn {
+  background: var(--warn-wash);
+  border-color: transparent;
+  color: var(--warn);
+}
+
+.pill--bad {
+  background: var(--bad-wash);
+  border-color: transparent;
+  color: var(--bad);
+}
+
+.pill--accent {
+  background: var(--accent-wash);
+  border-color: transparent;
+  color: var(--accent);
+}
+
+.dot {
+  width: 6px;
+  height: 6px;
+  border-radius: var(--r-full);
+  background: currentColor;
+  flex: none;
+}
+
+/* ---------------------------------------------------------------- fields */
+
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-width: 0;
+}
+
+.field > label,
+.field-label {
+  font-size: 12.5px;
+  font-weight: 540;
+  color: var(--ink-2);
+}
+
+.input,
+.field input,
+.field textarea,
+.field select {
+  width: 100%;
+  background: var(--sunken);
+  border: 1px solid var(--line);
+  border-radius: var(--r-sm);
+  padding: 10px 12px;
+  font-size: 14px;
+  outline: none;
+  transition: border-color var(--fast) var(--ease);
+}
+
+.input:focus,
+.field input:focus,
+.field textarea:focus,
+.field select:focus {
+  border-color: var(--accent);
+}
+
+.field textarea {
+  min-height: 84px;
+  resize: vertical;
+}
+
+.field select option {
+  background: var(--overlay);
+}
+
+.hint {
+  font-size: 12px;
+  color: var(--ink-3);
+  line-height: 1.45;
+}
+
+/* ---------------------------------------------------------------- notices */
+
+.notice {
+  display: flex;
+  gap: var(--s-3);
+  padding: var(--s-3) var(--s-4);
+  border-radius: var(--r-sm);
+  font-size: 13px;
+  line-height: 1.5;
+  background: var(--sunken);
+  border: 1px solid var(--line);
+  color: var(--ink-2);
+}
+
+.notice--good {
+  background: var(--good-wash);
+  border-color: transparent;
+  color: var(--good);
+}
+
+.notice--warn {
+  background: var(--warn-wash);
+  border-color: transparent;
+  color: var(--warn);
+}
+
+.notice--bad {
+  background: var(--bad-wash);
+  border-color: transparent;
+  color: var(--bad);
+}
+
+.notice svg {
+  flex: none;
+  margin-top: 1px;
+}
+
+/* ---------------------------------------------------------------- toasts */
+
+.toasts {
+  position: fixed;
+  right: var(--s-5);
+  bottom: var(--s-5);
+  z-index: 60;
+  display: flex;
+  flex-direction: column;
+  gap: var(--s-2);
+  max-width: min(380px, calc(100vw - var(--s-8)));
+}
+
+.toast {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--s-3);
+  padding: var(--s-3) var(--s-4);
+  border-radius: var(--r-md);
+  background: var(--overlay);
+  border: 1px solid var(--line);
+  box-shadow: var(--shadow-lg);
+  font-size: 13.5px;
+  animation: toast-in var(--med) var(--ease);
+}
+
+@keyframes toast-in {
+  from {
+    opacity: 0;
+    transform: translateY(8px) scale(0.98);
+  }
+}
+
+.toast-body {
+  flex: 1;
+  min-width: 0;
+  word-break: break-word;
+}
+
+.toast-close {
+  border: 0;
+  background: transparent;
+  color: var(--ink-3);
+  cursor: pointer;
+  padding: 0;
+  line-height: 1;
+}
+
+.toast-close:hover {
+  color: var(--ink);
+}
+
+@media (max-width: 560px) {
+  .toasts {
+    left: var(--s-4);
+    right: var(--s-4);
+    bottom: var(--s-4);
+    max-width: none;
+  }
+}
+
+/* ---------------------------------------------------------------- drawer */
+
+/*
+ * A panel that floats beside the page rather than over it.
+ *
+ * No scrim, deliberately. An overlay that dims the screen says "deal with me first", and
+ * an account panel has no business saying that — you open it to check a balance while
+ * doing something else, and the something else has to stay usable. It also sits below the
+ * bar, so navigation keeps working with the panel open.
+ */
+.drawer {
+  position: fixed;
+  top: calc(var(--nav-h) + var(--s-3));
+  right: var(--s-3);
+  bottom: var(--s-3);
+  z-index: 40;
+  width: min(360px, calc(100vw - var(--s-6)));
+  display: flex;
+  flex-direction: column;
+  background: var(--overlay);
+  border: 1px solid var(--line);
+  border-radius: var(--r-lg);
+  box-shadow: var(--shadow-lg);
+  animation: drawer-in var(--med) var(--ease);
+}
+
+@keyframes drawer-in {
+  from {
+    transform: translate(8px, -4px);
+    opacity: 0;
+  }
+}
+
+.drawer-head {
+  display: flex;
+  align-items: center;
+  gap: var(--s-2);
+  padding: var(--s-4);
+  border-bottom: 1px solid var(--line);
+}
+
+.drawer-body {
+  flex: 1;
+  overflow-y: auto;
+  padding: var(--s-4);
+  display: flex;
+  flex-direction: column;
+  gap: var(--s-5);
+}
+
+/* The address, as a chip you can lift. */
+.addr {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--s-2);
+  flex: 1;
+  min-width: 0;
+  border: 0;
+  background: transparent;
+  color: var(--ink);
+  font-family: var(--font-mono);
+  font-size: 13px;
+  padding: 4px 6px;
+  border-radius: var(--r-xs);
+  cursor: pointer;
+  transition: background var(--fast) var(--ease);
+}
+
+.addr:hover {
+  background: var(--sunken);
+}
+
+.addr img {
+  width: 22px;
+  height: 22px;
+  border-radius: var(--r-full);
+  flex: none;
+}
+
+/* A holding: mark, name, and what you have of it. */
+.holding {
+  display: flex;
+  align-items: center;
+  gap: var(--s-3);
+  padding: var(--s-2) 0;
+}
+
+.holding img {
+  width: 30px;
+  height: 30px;
+  border-radius: var(--r-full);
+  flex: none;
+}
+
+.holding-name {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
+
+.holding-name strong {
+  font-size: 14px;
+  font-weight: 560;
+}
+
+.holding-value {
+  text-align: right;
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  align-items: flex-end;
+}
+
+@media (max-width: 560px) {
+  .drawer {
+    top: auto;
+    left: var(--s-3);
+    width: auto;
+    max-height: 78vh;
+  }
+}
+
+/* ---------------------------------------------------------------- dialog */
+
+.scrim {
+  position: fixed;
+  inset: 0;
+  z-index: 50;
+  background: rgba(4, 6, 9, 0.6);
+  backdrop-filter: blur(4px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: var(--s-5);
+  overflow-y: auto;
+  animation: fade var(--fast) var(--ease);
+}
+
+@keyframes fade {
+  from {
+    opacity: 0;
+  }
+}
+
+.dialog {
+  width: 100%;
+  max-width: 520px;
+  margin: auto;
+  background: var(--overlay);
+  border: 1px solid var(--line);
+  border-radius: var(--r-lg);
+  box-shadow: var(--shadow-lg);
+  animation: dialog-in var(--med) var(--ease);
+}
+
+@keyframes dialog-in {
+  from {
+    opacity: 0;
+    transform: translateY(10px) scale(0.985);
+  }
+}
+
+.dialog-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--s-4);
+  padding: var(--s-5) var(--s-5) var(--s-4);
+}
+
+.dialog-body {
+  padding: 0 var(--s-5) var(--s-5);
+  display: flex;
+  flex-direction: column;
+  gap: var(--s-4);
+}
+
+/* ---------------------------------------------------------------- table */
+
+table.plain {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13.5px;
+}
+
+table.plain th {
+  text-align: left;
+  font-size: 12px;
+  font-weight: 540;
+  color: var(--ink-3);
+  padding: 0 var(--s-3) var(--s-2) 0;
+  white-space: nowrap;
+}
+
+table.plain td {
+  padding: var(--s-3) var(--s-3) var(--s-3) 0;
+  border-top: 1px solid var(--line);
+}
+
+table.plain tr:hover td {
+  background: color-mix(in srgb, var(--ink) 3%, transparent);
+}
+
+table.plain td:last-child,
+table.plain th:last-child {
+  text-align: right;
+  padding-right: 0;
+}
+
+/* ---------------------------------------------------------------- validators */
+
+.val {
+  display: flex;
+  align-items: center;
+  gap: var(--s-3);
+  min-width: 0;
+}
+
+.val-mark {
+  width: 26px;
+  height: 26px;
+  border-radius: var(--r-full);
+  flex: none;
+  display: grid;
+  place-items: center;
+  font-size: 11px;
+  font-weight: 620;
+  color: #fff;
+  text-shadow: 0 1px 1px rgba(0, 0, 0, 0.25);
+}
+
+.val-name {
+  font-size: 13.5px;
+  font-weight: 560;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* Revealed on hover, because they are for the one row you are looking at. */
+.val-tools {
+  display: flex;
+  gap: 2px;
+  opacity: 0;
+  transition: opacity var(--fast) var(--ease);
+}
+
+.val:hover .val-tools,
+.val:focus-within .val-tools {
+  opacity: 1;
+}
+
+.val-tool {
+  border: 0;
+  background: transparent;
+  color: var(--ink-3);
+  padding: 3px;
+  border-radius: var(--r-xs);
+  cursor: pointer;
+  display: grid;
+  place-items: center;
+}
+
+.val-tool:hover {
+  color: var(--ink);
+  background: var(--sunken);
+}
+
+@media (hover: none) {
+  .val-tools {
+    opacity: 1;
+  }
+}
+
+/* ---------------------------------------------------------------- charts */
+
+.chart {
+  width: 100%;
+  display: block;
+  overflow: visible;
+}
+
+.chart-grid {
+  stroke: var(--line);
+  stroke-width: 1;
+}
+
+.chart-line {
+  fill: none;
+  stroke: var(--accent);
+  stroke-width: 2;
+  stroke-linejoin: round;
+  stroke-linecap: round;
+}
+
+.chart-fill-from {
+  stop-color: var(--accent);
+  stop-opacity: 0.22;
+}
+
+.chart-fill-to {
+  stop-color: var(--accent);
+  stop-opacity: 0;
+}
+
+.chart-axis {
+  font-size: 11px;
+  fill: var(--ink-3);
+  font-variant-numeric: tabular-nums;
+}
+
+.chart-marker {
+  fill: var(--accent);
+  stroke: var(--raised);
+  stroke-width: 3;
+}
+
+.chart-crosshair {
+  stroke: var(--line-strong);
+  stroke-width: 1;
+  stroke-dasharray: 3 3;
+}
+
+.chart-bar {
+  fill: var(--accent);
+}
+
+.chart-bar-track {
+  fill: var(--line);
+}
+
+.chart-wrap {
+  position: relative;
+}
+
+.tooltip {
+  position: absolute;
+  pointer-events: none;
+  background: var(--overlay);
+  border: 1px solid var(--line);
+  border-radius: var(--r-sm);
+  box-shadow: var(--shadow-md);
+  padding: var(--s-2) var(--s-3);
+  font-size: 12.5px;
+  white-space: nowrap;
+  transform: translate(-50%, -125%);
+  z-index: 5;
+}
+
+/* ---------------------------------------------------------------- skeleton */
+
+.skel {
+  background: linear-gradient(
+    90deg,
+    var(--sunken) 25%,
+    color-mix(in srgb, var(--ink) 6%, var(--sunken)) 37%,
+    var(--sunken) 63%
+  );
+  background-size: 400% 100%;
+  animation: shimmer 1.4s ease infinite;
+  border-radius: var(--r-xs);
+  display: inline-block;
+}
+
+@keyframes shimmer {
+  from {
+    background-position: 100% 0;
+  }
+  to {
+    background-position: -100% 0;
+  }
+}
+
+/* ---------------------------------------------------------------- misc */
+
+pre.payload {
+  background: var(--sunken);
+  border: 1px solid var(--line);
+  border-radius: var(--r-sm);
+  padding: var(--s-4);
+  margin: 0;
+  overflow-x: auto;
+  font-family: var(--font-mono);
+  font-size: 12px;
+  line-height: 1.55;
+  color: var(--ink-2);
+}
+
+.footer {
+  border-top: 1px solid var(--line);
+  padding: var(--s-5) var(--s-6);
+}
+
+.footer-inner {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--s-4);
+  flex-wrap: wrap;
+  font-size: 12.5px;
+  color: var(--ink-3);
+}
+
+.footer a {
+  color: var(--ink-3);
+  text-decoration: none;
+}
+
+.footer a:hover {
+  color: var(--ink);
+}
+
+.link {
+  color: var(--accent);
+  text-decoration: none;
+  font-weight: 540;
+}
+
+.link:hover {
+  text-decoration: underline;
+}
+
+.empty {
+  padding: var(--s-10) var(--s-5);
+  text-align: center;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--s-2);
+}
+
+.spin {
+  animation: spin 900ms linear infinite;
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}

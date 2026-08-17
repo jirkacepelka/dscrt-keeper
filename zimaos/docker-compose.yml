@@ -1,0 +1,110 @@
+# dSCRT keeper, for ZimaOS.
+#
+# App Store -> Install a custom App -> paste this file. Nothing else: no SSH, no git clone,
+# no build on the NAS, and nothing to edit before it starts. Everything the keeper needs —
+# the recovery phrase, the endpoint, the contract, how often it compounds — is set in the
+# console the tile opens.
+#
+# The same file works on plain Docker Compose; the `x-casaos` block is metadata ZimaOS reads
+# and everything else ignores.
+name: dscrt-keeper
+
+services:
+  keeper:
+    image: ghcr.io/jirkacepelka/dscrt-keeper:latest
+    container_name: dscrt-keeper
+    restart: unless-stopped
+
+    ports:
+      - target: 8787
+        published: "8787"
+        protocol: tcp
+
+    volumes:
+      # Settings, the operation ledger, the drift baselines, and the key if you set one from
+      # the console. ZimaOS creates this directory owned by root; the container starts as
+      # root, hands it to its unprivileged user, and drops before running anything. See
+      # docker-entrypoint.sh.
+      - type: bind
+        source: /DATA/AppData/$AppID/data
+        target: /data
+
+    environment:
+      TZ: $TZ
+      # Anything set here wins over the console, permanently, and the console will show the
+      # field as unreachable rather than accept an edit that would go nowhere. That is the
+      # right trade for a deployment you want pinned by this file — and the wrong one if you
+      # would rather configure it from the page, so both are left commented out.
+      #
+      # KEEPER_MNEMONIC: "twelve or twenty four words"
+      #
+      # Only needed if you chose to encrypt the stored phrase. Without it the keeper comes
+      # back from a restart reading the protocol but unable to sign, until somebody unlocks
+      # it in the console.
+      # KEEPER_PASSPHRASE: ""
+
+    read_only: true
+    security_opt:
+      - no-new-privileges:true
+
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "5"
+
+    deploy:
+      resources:
+        limits:
+          memory: 256M
+
+x-casaos:
+  architectures:
+    - amd64
+    - arm64
+  main: keeper
+  author: jirkacepelka
+  developer: jirkacepelka
+  category: Utilities
+  icon: https://raw.githubusercontent.com/jirkacepelka/dscrt-keeper/main/web/brand/dSCRT.png
+  thumbnail: https://raw.githubusercontent.com/jirkacepelka/dscrt-keeper/main/web/brand/dSCRT.png
+  title:
+    en_us: dSCRT Keeper
+  tagline:
+    en_us: Permissionless upkeep for dSCRT liquid staking on Secret Network.
+  description:
+    en_us: >-
+      Keeps the dSCRT liquid staking protocol running: harvests staking rewards and restakes
+      them, closes each withdrawal window when it falls due, and books what has finished
+      unbonding. It watches the protocol at the same time and reports anything that looks
+      wrong — a falling exchange rate, a validator that has quietly stopped earning, an
+      account running out of gas.
+
+      Everything is configured in its own web console, which also shows the keeper's address
+      and every transaction it has ever sent, with a link to the explorer for each one.
+
+      The keeper is not a privileged component. Every message it sends is one anyone could
+      send: its key needs gas and nothing else, and it cannot move user funds, change the
+      protocol's fee, or touch the validator set. A dead keeper costs yield, not access.
+  tips:
+    before_install:
+      en_us: |
+        **This holds a hot wallet key, and it needs gas.**
+
+        - Use a key that holds gas and nothing else. Never the protocol manager's key.
+        - Budget roughly **6 SCRT a month** at hourly compounding. The console prices every
+          cadence before you pick one, and 6-hourly costs about a sixth of that without
+          earning any less.
+        - The console asks you to set a password the first time you open it. There is no
+          default, because a shipped default is a published one.
+        - Nothing is required before installing. Open the tile, set a password, paste a
+          recovery phrase, done.
+    after_install:
+      en_us: |
+        Open the tile and set a console password, then paste the keeper's recovery phrase.
+
+        The keeper starts reading the protocol immediately and will report on it whether or
+        not a key is configured — it simply cannot send anything until one is.
+  index: /
+  port_map: "8787"
+  scheme: http

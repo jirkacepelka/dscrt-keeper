@@ -1,20 +1,48 @@
-# Run the keeper on anything with Docker — a home server does the job.
+# Build the keeper from source and run it.
 #
-#   cp .env.example .env      and fill it in
 #   docker compose up -d
 #
+# Then open http://localhost:8787 and set a console password. Nothing else is required:
+# the endpoint, the contract, the cadence and the key are all set from that page.
+#
+# For a one-click install on ZimaOS from a published image, use `zimaos/docker-compose.yml`
+# instead. This file is for anyone who would rather run what they can read than trust an
+# image somebody else built — which, for a container holding a signing key, is a reasonable
+# thing to want.
 services:
   keeper:
     build:
       context: .
       dockerfile: Dockerfile
-    env_file: .env
     restart: unless-stopped
-    # Outbound only. Nothing listens, so nothing needs exposing.
-    network_mode: bridge
+
+    # Optional now.
+    #
+    # It used to be required, because the mnemonic and the contract had nowhere else to
+    # live. Anything set here still wins over anything set in the console — see the note on
+    # precedence in src/config.ts — so this is the right place for a deployment that wants
+    # its configuration pinned by the file that starts it.
+    env_file:
+      - path: .env
+        required: false
+
+    ports:
+      # The console. Bound to every interface inside the container and published here; if
+      # this machine is reachable from outside your network, publish it as
+      # "127.0.0.1:8787:8787" and reach it over a tunnel instead.
+      - "8787:8787"
+
+    volumes:
+      # Settings, the operation ledger, the drift baselines, and the key if you set one from
+      # the console. Back this up; losing it loses the history and the key, though not the
+      # ability to run — the keeper will simply ask you to configure it again.
+      - ./data:/data
+
+    # Everything except the data volume stays immutable.
     read_only: true
     security_opt:
       - no-new-privileges:true
+
     logging:
       driver: json-file
       options:
